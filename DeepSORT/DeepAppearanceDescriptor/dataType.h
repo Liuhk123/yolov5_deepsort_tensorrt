@@ -7,6 +7,7 @@
 
 #include <Eigen/Core>
 #include <Eigen/Dense>
+
 typedef Eigen::Matrix<float, 1, 4, Eigen::RowMajor> DETECTBOX;
 typedef Eigen::Matrix<float, -1, 4, Eigen::RowMajor> DETECTBOXSS;
 typedef Eigen::Matrix<float, 1, 128, Eigen::RowMajor> FEATURE;

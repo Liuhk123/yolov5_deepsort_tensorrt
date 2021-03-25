@@ -27,28 +27,26 @@ tracker::tracker(/*NearNeighborDisMetric *metric,*/
 }
 
 void tracker::predict()
-{    
+{
+    printf("卡尔曼滤波预测track数目为%d：",tracks.size());
     for(Track& track:tracks) {
         track.predit(kf);
     }
 }
 
-std::vector<Track> tracker::update(const DETECTIONS &detections)
-{
+std::vector<Track> tracker::update(const DETECTIONS &detections) {
     TRACHER_MATCHD res;
     _match(detections, res);
 
     vector<MATCH_DATA>& matches = res.matches;
-    //#ifdef MY_inner_DEBUG
-    //    printf("res.matches size = %d:\n", matches.size());
-    //#endif
+
     for(MATCH_DATA& data:matches) {
         int track_idx = data.first;
         int detection_idx = data.second;
         //#ifdef MY_inner_DEBUG
         //        printf("\t%d == %d;\n", track_idx, detection_idx);
         //#endif
-        tracks[track_idx].update(this->kf, detections[detection_idx]);
+        tracks[track_idx].update(this->kf, detections[detection_idx], detections[detection_idx].type);
     }
     vector<int>& unmatched_tracks = res.unmatched_tracks;
     //#ifdef MY_inner_DEBUG
@@ -101,11 +99,15 @@ void tracker::_match(const DETECTIONS &detections, TRACHER_MATCHD &res)
     vector<int> iou_track_candidates;
     iou_track_candidates.assign(unconfirmed_tracks.begin(), unconfirmed_tracks.end());
     vector<int>::iterator it;		
-    for(it = matcha.unmatched_tracks.begin(); it != matcha.unmatched_tracks.end();) {
+    for(it = confirmed_tracks.begin(); it != confirmed_tracks.end();) {
         int idx = *it;
         if(tracks[idx].time_since_update == 1) { //push into unconfirmed
             iou_track_candidates.push_back(idx);
-            it = matcha.unmatched_tracks.erase(it);
+            it = confirmed_tracks.erase(it);
+            continue;
+        } else {
+            matcha.unmatched_tracks.push_back(idx);
+            it = confirmed_tracks.erase(it);
             continue;
         }
         ++it;
@@ -122,7 +124,7 @@ void tracker::_match(const DETECTIONS &detections, TRACHER_MATCHD &res)
                 iou_track_candidates,
                 matcha.unmatched_detections);
     //get result:
-    res.matches.assign(matcha.matches.begin(), matcha.matches.end());
+    res.matches.assign(matchb.matches.begin(), matchb.matches.end());
 //    res.matches.insert(res.matches.end(), matchb.matches.begin(), matchb.matches.end());
     //unmatched_tracks;
     res.unmatched_tracks.assign(
@@ -142,9 +144,10 @@ void tracker::_initiate_track(const DETECTION_ROW &detection)
     KAL_DATA data = kf->initiate(detection.to_xyah());
     KAL_MEAN mean = data.first;
     KAL_COVA covariance = data.second;
+    int type = detection.type;
 
     this->tracks.push_back(Track(mean, covariance, this->_next_idx, this->n_init,
-                                 this->max_age, detection.feature));
+                                 this->max_age, type, detection));
     _next_idx += 1;
 }
 

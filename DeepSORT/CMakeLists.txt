@@ -19,12 +19,13 @@ else ()
     message(FATAL_ERROR "Could not locate OpenCV")
 endif()
 
-include_directories(${PROJECT_SOURCE_DIR}/KalmanFilter ./DeepAppearanceDescriptor ./MunkresAssignment ./MunkresAssignment/munkres /usr/local/include/eigen3/)
+include_directories(/usr/local/include/eigen3)
+include_directories(${PROJECT_SOURCE_DIR} ./KalmanFilter ./DeepAppearanceDescriptor ./MunkresAssignment ./MunkresAssignment/munkres)
 
-file(GLOB SOURCE_FILES "./KalmanFilter/*.cpp" "./DeepAppearanceDescriptor/*.cpp" "./MunkresAssignment/*.cpp" "./MunkresAssignment/munkres/*.cpp")
+file(GLOB SOURCE_FILES "./KalmanFilter/*.cpp" "./DeepAppearanceDescriptor/*.cpp" "./MunkresAssignment/*.cpp" "./MunkresAssignment/munkres/*.cpp" )
 
 message(STATUS "source files ${SOURCE_FILES}")
-add_library(deepsort ${SOURCE_FILES})
+add_library(deepsort ${SOURCE_FILES} track_deepsort.cpp)
 
 target_link_libraries(deepsort /usr/lib64/libuuid.so.1)
 target_link_libraries (deepsort ${OpenCV_LIBS})

@@ -9,26 +9,28 @@
 #include <vector>
 #include "cuda_runtime.h"
 #include "npp.h"
+
+#include "DeepSORT/track_deepsort.h"
 using namespace std;
 
 void make_input(const cv::Mat& img, void* gpu_data_planes, int count);
 
-cv::Rect get_rect(cv::Mat& img, float bbox[4]) {
+cv::Rect get_rect(cv::Size size, float bbox[4]) {
     int l, r, t, b;
-    float r_w = INPUT_W / (img.cols * 1.0);
-    float r_h = INPUT_H / (img.rows * 1.0);
+    float r_w = INPUT_W / (size.width * 1.0);
+    float r_h = INPUT_H / (size.height * 1.0);
     if (r_h > r_w) {
         l = bbox[0] - bbox[2] / 2.f;
         r = bbox[0] + bbox[2] / 2.f;
-        t = bbox[1] - bbox[3] / 2.f - (INPUT_H - r_w * img.rows) / 2;
-        b = bbox[1] + bbox[3] / 2.f - (INPUT_H - r_w * img.rows) / 2;
+        t = bbox[1] - bbox[3] / 2.f - (INPUT_H - r_w * size.height) / 2;
+        b = bbox[1] + bbox[3] / 2.f - (INPUT_H - r_w * size.height) / 2;
         l = l / r_w;
         r = r / r_w;
         t = t / r_w;
         b = b / r_w;
     } else {
-        l = bbox[0] - bbox[2] / 2.f - (INPUT_W - r_h * img.cols) / 2;
-        r = bbox[0] + bbox[2] / 2.f - (INPUT_W - r_h * img.cols) / 2;
+        l = bbox[0] - bbox[2] / 2.f - (INPUT_W - r_h * size.width) / 2;
+        r = bbox[0] + bbox[2] / 2.f - (INPUT_W - r_h * size.width) / 2;
         t = bbox[1] - bbox[3] / 2.f;
         b = bbox[1] + bbox[3] / 2.f;
         l = l / r_h;
@@ -39,6 +41,44 @@ cv::Rect get_rect(cv::Mat& img, float bbox[4]) {
     return cv::Rect(l, t, r - l, b - t);
 }
 
+cv::Rect get_rect(cv::Mat& img, float bbox[4]) {
+    // x
+    int l, r, t, b;
+    float r_w = INPUT_W / (img.cols * 1.0);
+    float r_h = INPUT_H / (img.rows * 1.0);
+    if (r_h > r_w) {
+
+        l = bbox[0] - bbox[2] / 2.f;
+        r = bbox[0] + bbox[2] / 2.f;
+        t = bbox[1] - bbox[3] / 2.f- (INPUT_H - r_w * img.rows) / 2;
+        b = bbox[1] + bbox[3] / 2.f- (INPUT_H - r_w * img.rows) / 2;
+        l = l / r_w;
+        r = r / r_w;
+        t = t / r_w;
+        b = b / r_w;
+
+    } else {
+        l = bbox[0] - bbox[2] / 2.f - (INPUT_W - r_h * img.cols) / 2;
+        r = bbox[0] + bbox[2] / 2.f- (INPUT_W - r_h * img.cols) / 2;
+        t = bbox[1] - bbox[3] / 2.f;
+        b = bbox[1] + bbox[3] / 2.f;
+        l = l / r_h;
+        r = r / r_h;
+        t = t / r_h;
+        b = b / r_h;
+    }
+    return cv::Rect(l, t, r - l, b - t);
+}
+
+void get_detections(DETECTBOX box, float confidence, int type, DETECTIONS &d, int timestamp) {
+    DETECTION_ROW tmpRow;
+    tmpRow.tlwh = box;//DETECTBOX(x, y, w, h);
+    tmpRow.type = type;
+    tmpRow.timestamp = timestamp;
+    tmpRow.shelter = false;
+    tmpRow.confidence = confidence;
+    d.push_back(tmpRow);
+}
 
 int main(int argc, char** argv) {
     string engineFileName = "../yolov5s.engine";
@@ -68,7 +108,9 @@ int main(int argc, char** argv) {
         static float data[BATCH_SIZE * 3 * INPUT_H * INPUT_W];
         void* gpu_data_planes;
         cudaMalloc(&gpu_data_planes, BATCH_SIZE * INPUT_W * INPUT_H * 3 * sizeof(float));
-        for (int f = 0; f < 5; f++) {
+        int timestamp = 0;
+        track_deepsort track;
+        for (int f = 0; f < 10; f++) {
             auto start = std::chrono::system_clock::now();
             vector<cv::Mat> imgs;
             for (int b = 0; b < BATCH_SIZE; b++) {
@@ -93,13 +135,30 @@ int main(int argc, char** argv) {
             for (int b = 0; b < BATCH_SIZE; b++) {
                 auto& res = results[b];
                 auto& image = images[b];
+
                 //std::cout << res.size() << std::endl;
                 for (size_t j = 0; j < res.size(); j++) {
-                    cv::Rect r = get_rect(image, res[j].bbox);
+                    cv::Rect r = get_rect(size, res[j].bbox);
                     cv::rectangle(image, r, cv::Scalar(0x27, 0xC1, 0x36), 2);
                     cv::putText(image, std::to_string((int)res[j].class_id), cv::Point(r.x, r.y - 1), cv::FONT_HERSHEY_PLAIN, 1.2, cv::Scalar(0xFF, 0xFF, 0xFF), 2);
                 }
                 cv::imwrite("./result/a_" + to_string(f) + "_" +  to_string(b) + ".jpg", image);
+
+                // Track
+                DETECTIONS detections;
+                for (int i = 0; i < res.size(); i++) {
+                    cv::Rect r = get_rect(size, res[i].bbox);
+                    int x = r.x;
+                    int y = r.y;
+                    int w = r.width;
+                    int h = r.height;
+                    if (x >= size.width || x < 0 || y >= size.height || y < 0) {
+                        continue;
+                    }
+                    get_detections(DETECTBOX(x, y, w, h), res[i].conf, res[i].class_id, detections, timestamp);
+                }
+                timestamp += 1;
+                track.run(detections);
             }
             images.clear();
         }

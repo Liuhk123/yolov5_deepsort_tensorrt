@@ -14,6 +14,8 @@ add_subdirectory ("yolov5")
 add_subdirectory("DeepSORT")
 
 find_package(CUDA REQUIRED)
+
+include_directories(/usr/local/include/eigen3)
 # cuda
 include_directories(/usr/local/cuda-11.1/include)
 link_directories(/usr/local/cuda-11.1/lib64)
@@ -22,7 +24,7 @@ include_directories(/home/source_code/TensorRT-7.2.2.3/include/)
 link_directories(/home/source_code/TensorRT-7.2.2.3/lib/)
 
 
-add_executable(TrackCounter ${DIR_SRCS} main.cpp)
+add_executable(TrackCounter ${DIR_SRCS} main.cpp DeepSORT/track_deepsort.cpp DeepSORT/track_deepsort.h)
 # 添加链接库，MyMath是子目录中的链接库名
 target_link_libraries(TrackCounter yolov5)
 target_link_libraries(TrackCounter deepsort)
