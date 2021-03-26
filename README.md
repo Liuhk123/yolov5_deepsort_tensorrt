@@ -1,6 +1,11 @@
 ## yolov5_deepsort_tensorrt
 
-This repository uses yolov5 and TensorRT to deploy object tracking algorithms. Deep-sort algorithm are used to track the objects.Thank you all for  the contribution of tensorrtx and deepsort.This project is all implemented in C++ language, and the preprocessing code of the detection part is run on the GPU using npp programming.
+This repository uses yolov5 and TensorRT to deploy object tracking algorithms. Deep-sort algorithm are used to track the objects.Thank you all for  the contribution of tensorrtx and deepsort.This project is all implemented in C++ language, and the preprocessing code of the detection part is run on the GPU using npp programming.The cost time of the inference is 3ms, and the preprocessing time is 6ms.
+
+## environment
+Tesla T4
+cuda 11.1
+TensorRT 7.2.2.3
 
 ## Install
 
